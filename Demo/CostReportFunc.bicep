@@ -1,3 +1,5 @@
+targetScope = 'resourceGroup'
+
 @description('The base app name for the resources.')
 @maxLength(20)
 param appName string = 'costapp${uniqueString(resourceGroup().id)}'
@@ -45,15 +47,19 @@ var commonAppSettings = [
     value: '~4'
   }
   {
-    name: 'FUNCTIONS_APP_EDIT_MODE'
+    name: 'FUNCTION_APP_EDIT_MODE'
     value: 'readonly'
   }
   {
-    name: 'APPLICATIONINSIGHTS_CONNECTION_STRING '
-    value: 'InstrumentationKey=${appInsights.properties.InstrumentationKey}'
+    name: 'APPINSIGHTS_INSTRUMENTATIONKEY'
+    value: appInsights.properties.InstrumentationKey
   }
   {
-    name: 'ApplicationInsightsAgent_EXTENSION_VERSION '
+    name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+    value: appInsights.properties.ConnectionString
+  }
+  {
+    name: 'ApplicationInsightsAgent_EXTENSION_VERSION'
     value: '~2'
   }
   {
@@ -91,7 +97,27 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     WorkspaceResourceId: logAnalyticsWorkspace.id
+    Flow_Type: 'Bluefield'
     Application_Type: 'web'
+    Request_Source: 'rest'
+  }
+}
+
+resource diagnosticLogs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: appServicePlan.name
+  scope: appServicePlan
+  properties: {
+    workspaceId: logAnalyticsWorkspace.id
+    logs: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+        retentionPolicy: {
+          days: 30
+          enabled: true
+        }
+      }
+    ]
   }
 }
 
@@ -103,10 +129,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
   }
   kind: 'StorageV2'
   properties: {
-    supportsHttpsTrafficOnly: true
     minimumTlsVersion: 'TLS1_2'
     accessTier: 'Hot'
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: true
     encryption: {
       services: {
         blob: {
@@ -144,10 +170,10 @@ resource storageTable 'Microsoft.Storage/storageAccounts/tableServices/tables@20
 }
 
 resource costReaderAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id)
+  name: guid(resourceGroup().id, appName)
   scope: resourceGroup()
   properties: {
-    roleDefinitionId: '72fafb9e-0641-4937-9268-a91bfd8191a3' // Cost Management Reader
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '72fafb9e-0641-4937-9268-a91bfd8191a3') // Cost Management Reader
     principalId: functionAppCSharp.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -161,10 +187,12 @@ resource functionAppCSharp 'Microsoft.Web/sites@2022-09-01' = {
     type: 'SystemAssigned'
   }
   properties: {
-    dailyMemoryTimeQuota: 0
+    httpsOnly: true
     serverFarmId: appServicePlan.id
     siteConfig: {
-      netFrameworkVersion: 'v7.0'
+      minTlsVersion: '1.2'
+      netFrameworkVersion: 'v6.0'
+      alwaysOn: appServicePlanSKU == 'S1'
       appSettings: concat(commonAppSettings, [
         {
           name: 'FUNCTIONS_WORKER_RUNTIME'
@@ -188,9 +216,11 @@ resource functionAppPwsh 'Microsoft.Web/sites@2022-09-01' = {
   location: location
   kind: 'functionapp'
   properties: {
-    dailyMemoryTimeQuota: 0
+    httpsOnly: true
     serverFarmId: appServicePlan.id
     siteConfig: {
+      minTlsVersion: '1.2'
+      alwaysOn: appServicePlanSKU == 'S1'
       powerShellVersion: '7.2'
       appSettings: concat(commonAppSettings, [
         {

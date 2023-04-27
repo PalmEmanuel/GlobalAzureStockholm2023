@@ -6,32 +6,38 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Extensions.Logging;
 
 namespace PipeHow.CostReportFuncCSharp;
 
 public static class GetCostData
 {
+    private static ILogger logger;
     private static readonly HttpClient client = new();
 
     [FunctionName("GetCostData")]
     [return: Queue("%CostQueueName%")]
     public static async Task<CostDataResponse> Run(
-        [TimerTrigger("0 0 6 * * *")] TimerInfo timer) // Run daily at 6AM
+        [TimerTrigger("0 0 6 * * *")] TimerInfo _, ILogger log) // Run daily at 6AM
     {
+        logger = log;
         // Get access token
         var token = await GetManagedIdentityToken();
+        logger.LogInformation(token);
         // Get and post cost data to storage queue by returning it
-        return await GetCostManagementData(timer.ScheduleStatus.Last, token);
+        return await GetCostManagementData(token);
     }
 
-    public static async Task<CostDataResponse> GetCostManagementData(DateTime lastRun, string token)
+    public static async Task<CostDataResponse> GetCostManagementData(string token)
     {
         // Assemble URL for Cost Management API
         string scope = Environment.GetEnvironmentVariable("CostScope");
         string url = $"https://management.azure.com/{scope}/providers/Microsoft.CostManagement/query?api-version=2022-10-01";
         HttpRequestMessage request = new(HttpMethod.Get, url);
-        request.Headers.Add("Content-Type", "application/json");
         request.Headers.Add("Authorization", $"Bearer {token}");
+
+        var from = DateTime.UtcNow.AddDays(-2);
+        var to = DateTime.UtcNow.AddDays(-1);
 
         // Create JSON body using C# 11 multiline string interpolation
         string body = $$"""
@@ -48,14 +54,16 @@ public static class GetCostData
             },
             "timeframe": "Custom",
             "timePeriod": {
-                "from": "{{lastRun.AddDays(-1).ToShortDateString()}}",
-                "to": "{{lastRun.ToShortDateString()}}"
+                "from": "{{from:yyyy-MM-dd}}",
+                "to": "{{to:yyyy-MM-dd)}}"
             }
         }
         """;
+        request.Method = HttpMethod.Post;
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await client.SendAsync(request);
+        logger.LogInformation(await response.Content.ReadAsStringAsync());
         var contentStream = await response.Content.ReadAsStreamAsync();
         return await JsonSerializer.DeserializeAsync<CostDataResponse>(contentStream);
     }

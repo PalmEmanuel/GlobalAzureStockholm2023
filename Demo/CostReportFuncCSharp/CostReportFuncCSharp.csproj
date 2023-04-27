@@ -6,7 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Data.Tables" Version="12.8.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="4.*" />
+    <!-- The newest version of the Storage Bindings package is 5.* but it doesn't have Table support -->
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="4.0.5" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="4.1.1" />
   </ItemGroup>
   <ItemGroup>
