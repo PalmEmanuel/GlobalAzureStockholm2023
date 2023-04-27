@@ -13,10 +13,10 @@ public class CostDataResponse
     public string Location { get; set; }
     public string SKU { get; set; }
     public string ETag { get; set; }
-    public CostDataProperty Properties { get; set; }
+    public CostDataProperties Properties { get; set; }
 }
 
-public class CostDataProperty
+public class CostDataProperties
 {
     public string NextLink { get; set; }
     public List<CostDataColumn> Columns { get; set; }

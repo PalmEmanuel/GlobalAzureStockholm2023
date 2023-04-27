@@ -17,18 +17,17 @@ public static class GetCostData
 
     [FunctionName("GetCostData")]
     [return: Queue("%CostQueueName%")]
-    public static async Task<CostDataResponse> Run(
-        [TimerTrigger("0 0 6 * * *")] TimerInfo _, ILogger log) // Run daily at 6AM
+    public static async Task<string> Run(
+        [TimerTrigger("0 0 6 * * *")] TimerInfo timer, ILogger log) // Run daily at 6AM
     {
         logger = log;
         // Get access token
         var token = await GetManagedIdentityToken();
-        logger.LogInformation(token);
         // Get and post cost data to storage queue by returning it
-        return await GetCostManagementData(token);
+        return await GetCostManagementJsonData(token);
     }
 
-    public static async Task<CostDataResponse> GetCostManagementData(string token)
+    public static async Task<string> GetCostManagementJsonData(string token)
     {
         // Assemble URL for Cost Management API
         string scope = Environment.GetEnvironmentVariable("CostScope");
@@ -46,7 +45,7 @@ public static class GetCostData
             "dataset": {
                 "granularity": "Daily",
                 "aggregation": {
-                "totalCost": {
+                    "totalCost": {
                         "function": "Sum",
                         "name": "PreTaxCost"
                     }
@@ -54,8 +53,8 @@ public static class GetCostData
             },
             "timeframe": "Custom",
             "timePeriod": {
-                "from": "{{from:yyyy-MM-dd}}",
-                "to": "{{to:yyyy-MM-dd)}}"
+                "from": "{{from.ToShortDateString()}}",
+                "to": "{{to.ToShortDateString()}}"
             }
         }
         """;
@@ -63,9 +62,9 @@ public static class GetCostData
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await client.SendAsync(request);
-        logger.LogInformation(await response.Content.ReadAsStringAsync());
-        var contentStream = await response.Content.ReadAsStreamAsync();
-        return await JsonSerializer.DeserializeAsync<CostDataResponse>(contentStream);
+        var content = await response.Content.ReadAsStringAsync();
+        logger.LogInformation(content);
+        return content;
     }
 
     public static async Task<string> GetManagedIdentityToken()
