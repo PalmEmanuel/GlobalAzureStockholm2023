@@ -20,7 +20,7 @@ public class CostDataProperties
 {
     public string NextLink { get; set; }
     public List<CostDataColumn> Columns { get; set; }
-    public List<string> Rows { get; set; }
+    public List<List<string>> Rows { get; set; }
 }
 
 public class CostDataColumn
@@ -29,7 +29,7 @@ public class CostDataColumn
     public string Type { get; set; }
 }
 
-public class CostDataEntry : ITableEntity
+public class CostDataEntry
 {
     public double PreTaxCost { get; set; }
     public string UsageDate { get; set; }
@@ -37,6 +37,4 @@ public class CostDataEntry : ITableEntity
 
     public string PartitionKey { get; set; }
     public string RowKey { get; set; }
-    public DateTimeOffset? Timestamp { get; set; }
-    public ETag ETag { get; set; }
 }

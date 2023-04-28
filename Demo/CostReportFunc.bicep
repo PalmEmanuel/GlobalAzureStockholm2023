@@ -22,10 +22,10 @@ param appInsightsName string = '${appName}-appin'
 param logAnalyticsName string = '${appName}-log'
 
 @description('The name of the Azure Storage Table.')
-param tableName string = 'CostData'
+param tableName string = 'costdatatable'
 
 @description('The name of the Azure Storage Queue.')
-param queueName string = 'CostDataToProcess'
+param queueName string = 'costdataqueue'
 
 @description('The location for the deployed resources.')
 param location string = resourceGroup().location
@@ -71,6 +71,28 @@ var commonAppSettings = [
     value: queueName
   }
 ]
+var diagnosticProperties = {
+  metrics: [
+    {
+      category: 'AllMetrics'
+      enabled: true
+      retentionPolicy: {
+        days: 30
+        enabled: true
+      }
+    }
+  ]
+  logs: [
+    {
+      enabled: true
+      category: 'FunctionAppLogs'
+      retentionPolicy: {
+        days: 30
+        enabled: true
+      }
+    }
+  ]
+}
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
   name: appServicePlanName
@@ -103,22 +125,22 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
 }
 
-resource diagnosticLogs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  name: appServicePlan.name
-  scope: appServicePlan
-  properties: {
-    workspaceId: logAnalyticsWorkspace.id
-    logs: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-        retentionPolicy: {
-          days: 30
-          enabled: true
-        }
-      }
-    ]
-  }
+resource diagnosticLogsCSharp 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: csharpAppName
+  scope: functionAppCSharp
+  properties: union(
+    { workspaceId: logAnalyticsWorkspace.id },
+    diagnosticProperties
+  )
+}
+
+resource diagnosticLogsPwsh 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: pwshAppName
+  scope: functionAppPwsh
+  properties: union(
+    { workspaceId: logAnalyticsWorkspace.id },
+    diagnosticProperties
+  )
 }
 
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
@@ -192,19 +214,19 @@ resource functionAppCSharp 'Microsoft.Web/sites@2022-09-01' = {
       netFrameworkVersion: 'v6.0'
       alwaysOn: appServicePlanSKU == 'S1'
       appSettings: concat(commonAppSettings, [
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE' // Required for Consumption
-          value: csharpAppName
-        }
-        {
-          name: 'CostScope'
-          value: 'subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}'
-        }
-      ])
+          {
+            name: 'FUNCTIONS_WORKER_RUNTIME'
+            value: 'dotnet'
+          }
+          {
+            name: 'WEBSITE_CONTENTSHARE' // Required for Consumption
+            value: csharpAppName
+          }
+          {
+            name: 'CostScope'
+            value: 'subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup().name}'
+          }
+        ])
     }
   }
 }
@@ -221,15 +243,15 @@ resource functionAppPwsh 'Microsoft.Web/sites@2022-09-01' = {
       alwaysOn: appServicePlanSKU == 'S1'
       powerShellVersion: '7.2'
       appSettings: concat(commonAppSettings, [
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'powershell'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE' // Required for Consumption
-          value: pwshAppName
-        }
-      ])
+          {
+            name: 'FUNCTIONS_WORKER_RUNTIME'
+            value: 'powershell'
+          }
+          {
+            name: 'WEBSITE_CONTENTSHARE' // Required for Consumption
+            value: pwshAppName
+          }
+        ])
     }
   }
 }

@@ -12,7 +12,6 @@ namespace PipeHow.CostReportFuncCSharp;
 
 public static class GetCostData
 {
-    private static ILogger logger;
     private static readonly HttpClient client = new();
 
     [FunctionName("GetCostData")]
@@ -20,11 +19,26 @@ public static class GetCostData
     public static async Task<string> Run(
         [TimerTrigger("0 0 6 * * *")] TimerInfo timer, ILogger log) // Run daily at 6AM
     {
-        logger = log;
-        // Get access token
-        var token = await GetManagedIdentityToken();
-        // Get and post cost data to storage queue by returning it
-        return await GetCostManagementJsonData(token);
+        try
+        {
+            // Get access token
+            var token = await GetManagedIdentityToken();
+
+            // Get cost data from Cost Management API
+            var costDataString = await GetCostManagementJsonData(token);
+            log.LogInformation($"""
+            Cost data: {costDataString}
+            Next run: {timer.ScheduleStatus.Next:yyyy-MM-dd}
+            """);
+
+            // Post data as string to storage queue by returning it
+            return costDataString;
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Could not get cost management data!");
+            throw;
+        }
     }
 
     public static async Task<string> GetCostManagementJsonData(string token)
@@ -62,9 +76,7 @@ public static class GetCostData
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         var response = await client.SendAsync(request);
-        var content = await response.Content.ReadAsStringAsync();
-        logger.LogInformation(content);
-        return content;
+        return await response.Content.ReadAsStringAsync();
     }
 
     public static async Task<string> GetManagedIdentityToken()
