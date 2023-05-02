@@ -8,9 +8,9 @@ param appName string = 'costapp${uniqueString(resourceGroup().id)}'
 @maxLength(24)
 param storageAccountName string = '${appName}stg'
 
-// Y1 is consumption, but it's too cheap for the demo
+// Y1 is consumption
 @description('SKU of app service plan.')
-param appServicePlanSKU string = 'S1'
+param appServicePlanSKU string = 'Y1'
 
 @description('Name of app service plan.')
 param appServicePlanName string = '${appName}-asp'
@@ -212,7 +212,6 @@ resource functionAppCSharp 'Microsoft.Web/sites@2022-09-01' = {
     siteConfig: {
       minTlsVersion: '1.2'
       netFrameworkVersion: 'v6.0'
-      alwaysOn: appServicePlanSKU == 'S1'
       appSettings: concat(commonAppSettings, [
           {
             name: 'FUNCTIONS_WORKER_RUNTIME'
@@ -240,7 +239,6 @@ resource functionAppPwsh 'Microsoft.Web/sites@2022-09-01' = {
     serverFarmId: appServicePlan.id
     siteConfig: {
       minTlsVersion: '1.2'
-      alwaysOn: appServicePlanSKU == 'S1'
       powerShellVersion: '7.2'
       appSettings: concat(commonAppSettings, [
           {

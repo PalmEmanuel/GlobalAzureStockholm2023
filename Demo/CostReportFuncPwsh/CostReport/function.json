@@ -1,0 +1,25 @@
+{
+  "scriptFile": "CostReport.ps1",
+  "bindings": [
+    {
+      "authLevel": "function",
+      "type": "httpTrigger",
+      "direction": "in",
+      "name": "Request",
+      "methods": [
+        "get"
+      ]
+    },
+    {
+      "type": "http",
+      "direction": "out",
+      "name": "Response"
+    },
+    {
+      "type": "table",
+      "direction": "in",
+      "name": "CostTable",
+      "tableName": "%CostTableName%"
+    }
+  ]
+}
